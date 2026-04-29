@@ -1,0 +1,10 @@
+CREATE DATABASE IF NOT EXISTS tfgdb;
+
+USE tfgdb;
+
+CREATE TABLE tareas (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    titulo VARCHAR(100) NOT NULL,
+    descripcion TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
