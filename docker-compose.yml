@@ -1,26 +1,33 @@
 services:
+
   nginx:
-    image: nginx:latest
+    image: nginx:1.27          # versión fija, no latest
     ports:
       - "80:80"
     volumes:
-      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro   # read-only
     depends_on:
       - app
     networks:
       - tfg-net
+    cap_drop:
+      - ALL                    # elimina todas las capacidades del kernel
+    cap_add:
+      - NET_BIND_SERVICE       # solo la necesaria para abrir puerto 80
 
   app:
     build: .
     volumes:
-      - ./app:/var/www/html
+      - ./app:/var/www/html:ro  # la app no necesita escribir en su propio código
     depends_on:
       - db
     networks:
       - tfg-net
+    cap_drop:
+      - ALL
 
   db:
-    image: mysql:8
+    image: mysql:8.0           # versión fija
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
       MYSQL_DATABASE: ${MYSQL_DATABASE}
@@ -28,13 +35,18 @@ services:
       - db_data:/var/lib/mysql
     networks:
       - tfg-net
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - SETUID
+      - SETGID                 # MySQL los necesita para gestionar ficheros de datos
 
   node-exporter:
     image: prom/node-exporter:latest
     container_name: node-exporter
     restart: unless-stopped
-    ports:
-      - "9100:9100"
+    # Puerto eliminado: no necesita exposición externa, Prometheus lo accede por red interna
     networks:
       - tfg-net
 
@@ -43,12 +55,11 @@ services:
     container_name: mysqld-exporter
     restart: unless-stopped
     command:
-      - "--mysqld.address=tfg-db-1:3306"
+      - "--mysqld.address=db:3306"       # nombre de servicio interno, no nombre de contenedor
       - "--mysqld.username=root"
     environment:
       MYSQLD_EXPORTER_PASSWORD: ${MYSQL_ROOT_PASSWORD}
-    ports:
-      - "9104:9104"
+    # Puerto eliminado: solo Prometheus necesita accederlo
     depends_on:
       - db
     networks:
@@ -59,7 +70,7 @@ services:
     container_name: prometheus
     restart: unless-stopped
     volumes:
-      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro   # read-only
     ports:
       - "9090:9090"
     depends_on:
